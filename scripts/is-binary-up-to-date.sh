@@ -19,15 +19,15 @@ function check_release_version() {
 
     # Retrieve the latest released version
     latest_version_short=$(jq --raw-output ".latestRelease" "$LIST_FILE")
-    latest_version_long=$(jq --raw-output ".releases | .[\"${latest_version_short}\"]" "$LIST_FILE" | sed --regexp-extended --quiet 's/^soljson-v(.*).js$/\1/p')
+    latest_release_path=$(jq --raw-output ".releases | .[\"${latest_version_short}\"]" "$LIST_FILE")
 
     # Check if current version is the latest release
-    if [[ $current_version != "$latest_version_long" ]]; then
+    if [[ "soljson-v${current_version}.js" != "$latest_release_path" ]]; then
         fail "Version is not the latest release:\n    [current]: ${current_version}\n    [latest]: ${latest_version_short}"
     fi
 
     current_sha=$(shasum --binary --algorithm 256 ./soljson.js | awk '{ print $1 }')
-    release_sha=$(jq --raw-output ".builds[] | select(.longVersion == \"${latest_version_long}\") | .sha256" "$LIST_FILE" | sed 's/^0x//')
+    release_sha=$(jq --raw-output ".builds[] | select(.path == \"${latest_release_path}\") | .sha256" "$LIST_FILE" | sed 's/^0x//')
 
     # Check if sha matches
     if [[ $current_sha != "$release_sha" ]]; then
