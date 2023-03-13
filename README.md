@@ -318,6 +318,14 @@ var output = translate.prettyPrintLegacyAssemblyJSON(assemblyJSON, sourceCode)
 
 ## Browser Usage
 
+**NOTE**: We currently compile the wasm module in `soljson.js` synchronously (see [here](https://github.com/ethereum/solc-js/issues/581) for more information), which may not work in Chrome-based
+browsers since it limits the size of modules that can be compiled/fetched synchronously to avoid blocking the main thread.
+Thus, if you get an error like: `WebAssembly.Compile is disallowed on the main thread, if the buffer size is larger than 4KB`,
+when trying to use the method described [below](#directly-loading-the-module-does-not-work-on-chrome-based-browsers),
+please consider trying to use `solc` through a [web worker](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers) as described [here](#loading-solc-with-web-workers) instead.
+
+### Directly loading the module (does not work on chrome-based browsers)
+
 Add the version of `solc` you want to use into `index.html`:
 
 ```html
@@ -379,3 +387,45 @@ Alternatively, to iterate the releases, one can load `list.js` from `solc-bin`:
 ```
 
 This will result in two global variables, `window.soljsonReleases` listing all releases and `window.soljsonSources` listing all nightly builds and releases.
+
+### Loading solc with web workers
+
+Web Workers allow you to run javascript in the background in the browser, letting the browser's main thread free to do whatever it needs to do.
+A minimal example of how to use `solc` in a web worker is given below.
+You can also check this [repository](https://github.com/r0qs/solcjs-webworker-example) with the full code example.
+
+* index.html
+```html
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+</head>
+
+<body>
+	<script>
+		var worker = new Worker('./dist/bundle.js');
+		worker.addEventListener('message', function (e) {
+			console.log(e.data.version)
+		}, false);
+
+		worker.postMessage({})
+	</script>
+</body>
+
+</html>
+```
+
+* worker.js:
+```javascript
+importScripts('https://binaries.soliditylang.org/bin/soljson-v0.8.19+commit.7dd6d404.js')
+import wrapper from 'solc/wrapper';
+
+self.addEventListener('message', () => {
+	const compiler = wrapper(self.Module)
+	self.postMessage({
+		version: compiler.version()
+	})
+}, false)
+```
